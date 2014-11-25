@@ -21,6 +21,7 @@ from supervisor.tests.base import DummyFCGIProcessGroup
 
 from supervisor.process import Subprocess
 from supervisor.options import BadCommand
+import distutils
 
 class SubprocessTests(unittest.TestCase):
     def _getTargetClass(self):
@@ -693,6 +694,29 @@ class SubprocessTests(unittest.TestCase):
                          'signal SIGTERM')
         self.assertEqual(instance.killing, 1)
         self.assertEqual(options.kills[11], signal.SIGTERM)
+
+    @patch.object(distutils.spawn, 'find_executable', Mock(return_value=True))
+    def test_stop_with_prestopcmd_timeout_installed(self):
+        options = DummyOptions()
+        config = DummyPConfig(options, 'test', '/test', prestopcmd='/bin/echo')
+        instance = self._makeOne(config)
+        instance.pid = 11
+        dispatcher = DummyDispatcher(writable=True)
+        instance.dispatchers = {'foo':dispatcher}
+        from supervisor.states import ProcessStates
+        instance.state = ProcessStates.RUNNING
+        with patch('supervisor.process.subprocess') as subprocess:
+            mock_stdout = Mock()
+            subprocess.STDOUT = mock_stdout
+            instance.stop()
+            self.assertEqual(instance.administrative_stop, 1)
+            self.assertTrue(instance.delay)
+            self.assertEqual(options.logger.data[0], 'calling command /bin/echo on test (pid 11)')
+            self.assertEqual(options.logger.data[1], 'killing test (pid 11) with '
+                             'signal SIGTERM')
+            self.assertEqual(instance.killing, 1)
+            self.assertEqual(options.kills[11], signal.SIGTERM)
+            subprocess.check_output.assert_called_once_with(['timeout', '5', '/bin/echo', '11'], stderr=mock_stdout)
 
     def test_stop_not_in_stoppable_state_error(self):
         options = DummyOptions()

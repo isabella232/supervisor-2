@@ -4,6 +4,9 @@ import errno
 import shlex
 import traceback
 import signal
+import subprocess
+import distutils
+import re
 
 from supervisor.compat import maxint
 from supervisor.compat import StringIO
@@ -351,8 +354,53 @@ class Subprocess(object):
             options.write(2, "supervisor: child process was not spawned\n")
             options._exit(127) # exit process with code for spawn failure
 
+    def is_installed(executable):
+        return (distutils.spawn.find_executable(executable) != None)
+
+    def call_prestop_cmd(self):
+        """ If specified, call a command on the process, passing it the pid """
+        if not self.config.prestopcmd:
+          return
+
+        options = self.config.options
+        if not self.pid:
+            options.logger.debug("attempted to call command %s on %s but it wasn't running" %
+                   (self.config.prestopcmd, self.config.name))
+
+        options.logger.debug('calling command %s on %s (pid %s)'
+                             % (self.config.prestopcmd,
+                                self.config.name,
+                                self.pid)
+                             )
+
+        #timeout_cmd_available = is_installed('timeout')
+        timeout_cmd_available = (distutils.spawn.find_executable('timeout') != None)
+        try:
+            if timeout_cmd_available:
+              subprocess.check_output(['timeout', str(self.config.prestopcmd_timeout_sec), self.config.prestopcmd, str(self.pid)], stderr=subprocess.STDOUT)
+            else:
+              subprocess.check_output([self.config.prestopcmd, str(self.pid)], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            errmsg = ''
+            if timeout_cmd_available and e.returncode == 124:
+                errmsg = 'command %s on %s (pid %s) timed out. output: %s' % (
+                              self.config.prestopcmd,
+                              self.config.name,
+                              self.pid,
+                              re.split('(?:\r|\n)+', e.output))
+            else:
+                errmsg = 'command %s on %s (pid %s) returned a non-zero exit code (%d). output: %s' % (
+                                      self.config.prestopcmd,
+                                      self.config.name,
+                                      self.pid,
+                                      e.returncode,
+                                      re.split('(?:\r|\n)+', e.output))
+
+            options.logger.error(errmsg)
+
     def stop(self):
         """ Administrative stop """
+        self.call_prestop_cmd()
         self.administrative_stop = 1
         return self.kill(self.config.stopsignal)
 

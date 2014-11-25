@@ -510,6 +510,7 @@ class DummyPConfig:
                  stderr_events_enabled=False,
                  stderr_logfile_backups=0, stderr_logfile_maxbytes=0,
                  redirect_stderr=False,
+                 prestopcmd_timeout_sec=None, prestopcmd=None,
                  stopsignal=None, stopwaitsecs=10, stopasgroup=False, killasgroup=False,
                  exitcodes=(0,2), environment=None, serverurl=None):
         self.options = options
@@ -532,6 +533,10 @@ class DummyPConfig:
         self.stderr_logfile_backups = stderr_logfile_backups
         self.stderr_logfile_maxbytes = stderr_logfile_maxbytes
         self.redirect_stderr = redirect_stderr
+        if prestopcmd_timeout_sec is None:
+            prestopcmd_timeout_sec = 5
+        self.prestopcmd_timeout_sec = prestopcmd_timeout_sec
+        self.prestopcmd = prestopcmd
         if stopsignal is None:
             import signal
             stopsignal = signal.SIGTERM

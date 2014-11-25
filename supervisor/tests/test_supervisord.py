@@ -328,6 +328,8 @@ class SupervisordTests(unittest.TestCase):
                 'stderr_logfile_backups': 0, 'stderr_logfile_maxbytes': 0,
                 'stderr_syslog': False,
                 'redirect_stderr': False,
+                'prestopcmd_timeout_sec': None,
+                'prestopcmd': None,
                 'stopsignal': None, 'stopwaitsecs': 10,
                 'stopasgroup': False,
                 'killasgroup': False,

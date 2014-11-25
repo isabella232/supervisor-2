@@ -445,6 +445,8 @@ class ServerOptionsTests(unittest.TestCase):
         autostart=true
         user=root
         stdout_logfile=/tmp/cat.log
+        prestopcmd_timeout_sec=8
+        prestopcmd=/bin/echo
         stopsignal=KILL
         stopwaitsecs=5
         startsecs=5
@@ -531,6 +533,8 @@ class ServerOptionsTests(unittest.TestCase):
         self.assertEqual(proc1.startretries, 10)
         self.assertEqual(proc1.uid, 0)
         self.assertEqual(proc1.stdout_logfile, '/tmp/cat.log')
+        self.assertEqual(proc1.prestopcmd_timeout_sec, 8)
+        self.assertEqual(proc1.prestopcmd, '/bin/echo')
         self.assertEqual(proc1.stopsignal, signal.SIGKILL)
         self.assertEqual(proc1.stopwaitsecs, 5)
         self.assertEqual(proc1.stopasgroup, False)
@@ -2166,7 +2170,7 @@ class TestProcessConfig(unittest.TestCase):
                      'stdout_events_enabled', 'stdout_syslog',
                      'stderr_logfile', 'stderr_capture_maxbytes',
                      'stderr_events_enabled', 'stderr_syslog',
-                     'stopsignal', 'stopwaitsecs', 'stopasgroup',
+                     'prestopcmd_timeout_sec', 'prestopcmd', 'stopsignal', 'stopwaitsecs', 'stopasgroup',
                      'killasgroup', 'exitcodes', 'redirect_stderr',
                      'environment'):
             defaults[name] = name
@@ -2254,7 +2258,7 @@ class FastCGIProcessConfigTest(unittest.TestCase):
                      'stdout_events_enabled', 'stdout_syslog',
                      'stderr_logfile', 'stderr_capture_maxbytes',
                      'stderr_events_enabled', 'stderr_syslog',
-                     'stopsignal', 'stopwaitsecs', 'stopasgroup',
+                     'prestopcmd_timeout_sec', 'prestopcmd', 'stopsignal', 'stopwaitsecs', 'stopasgroup',
                      'killasgroup', 'exitcodes', 'redirect_stderr',
                      'environment'):
             defaults[name] = name

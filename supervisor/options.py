@@ -863,6 +863,8 @@ class ServerOptions(Options):
         startsecs = integer(get(section, 'startsecs', 1))
         startretries = integer(get(section, 'startretries', 3))
         stopsignal = signal_number(get(section, 'stopsignal', 'TERM'))
+        prestopcmd = get(section, 'prestopcmd', '', do_expand=False)
+        prestopcmd_timeout_sec = integer(get(section, 'prestopcmd_timeout_sec', '5'))
         stopwaitsecs = integer(get(section, 'stopwaitsecs', 10))
         stopasgroup = boolean(get(section, 'stopasgroup', 'false'))
         killasgroup = boolean(get(section, 'killasgroup', stopasgroup))
@@ -977,6 +979,8 @@ class ServerOptions(Options):
                 stderr_logfile_maxbytes=logfiles['stderr_logfile_maxbytes'],
                 stderr_syslog=logfiles['stderr_syslog'],
                 stopsignal=stopsignal,
+                prestopcmd=prestopcmd,
+                prestopcmd_timeout_sec=prestopcmd_timeout_sec,
                 stopwaitsecs=stopwaitsecs,
                 stopasgroup=stopasgroup,
                 killasgroup=killasgroup,
@@ -1733,6 +1737,7 @@ class ProcessConfig(Config):
         'stderr_logfile', 'stderr_capture_maxbytes',
         'stderr_logfile_backups', 'stderr_logfile_maxbytes',
         'stderr_events_enabled', 'stderr_syslog',
+        'prestopcmd', 'prestopcmd_timeout_sec',
         'stopsignal', 'stopwaitsecs', 'stopasgroup', 'killasgroup',
         'exitcodes', 'redirect_stderr' ]
     optional_param_names = [ 'environment', 'serverurl' ]
