@@ -22,6 +22,7 @@ from supervisor.tests.base import DummyFCGIProcessGroup
 from supervisor.process import Subprocess
 from supervisor.options import BadCommand
 import distutils
+import subprocess
 
 class SubprocessTests(unittest.TestCase):
     def _getTargetClass(self):
@@ -678,7 +679,8 @@ class SubprocessTests(unittest.TestCase):
                 pass
             signal.signal(signal.SIGCHLD, signal.SIG_DFL)
 
-    def test_stop(self):
+    @patch('supervisor.process.subprocess')
+    def test_stop(self, subprocess_mock):
         options = DummyOptions()
         config = DummyPConfig(options, 'test', '/test')
         instance = self._makeOne(config)
@@ -694,9 +696,11 @@ class SubprocessTests(unittest.TestCase):
                          'signal SIGTERM')
         self.assertEqual(instance.killing, 1)
         self.assertEqual(options.kills[11], signal.SIGTERM)
+        assert not subprocess_mock.check_output.called, 'subprocess_mock.check_output was called and should not have been'
 
-    @patch.object(distutils.spawn, 'find_executable', Mock(return_value=True))
-    def test_stop_with_prestopcmd_timeout_installed(self):
+    @patch.object(distutils.spawn, 'find_executable', Mock(return_value='/some/path'))
+    @patch('supervisor.process.subprocess')
+    def test_stop_with_prestopcmd(self, subprocess_mock):
         options = DummyOptions()
         config = DummyPConfig(options, 'test', '/test', prestopcmd='/bin/echo')
         instance = self._makeOne(config)
@@ -705,18 +709,70 @@ class SubprocessTests(unittest.TestCase):
         instance.dispatchers = {'foo':dispatcher}
         from supervisor.states import ProcessStates
         instance.state = ProcessStates.RUNNING
-        with patch('supervisor.process.subprocess') as subprocess:
-            mock_stdout = Mock()
-            subprocess.STDOUT = mock_stdout
-            instance.stop()
-            self.assertEqual(instance.administrative_stop, 1)
-            self.assertTrue(instance.delay)
-            self.assertEqual(options.logger.data[0], 'calling command /bin/echo on test (pid 11)')
-            self.assertEqual(options.logger.data[1], 'killing test (pid 11) with '
-                             'signal SIGTERM')
-            self.assertEqual(instance.killing, 1)
-            self.assertEqual(options.kills[11], signal.SIGTERM)
-            subprocess.check_output.assert_called_once_with(['timeout', '5', '/bin/echo', '11'], stderr=mock_stdout)
+        mock_stdout = Mock()
+        subprocess_mock.STDOUT = mock_stdout
+        instance.stop()
+        self.assertEqual(instance.administrative_stop, 1)
+        self.assertTrue(instance.delay)
+        self.assertEqual(options.logger.data[0], 'calling command /bin/echo on test (pid 11)')
+        self.assertEqual(options.logger.data[1], 'killing test (pid 11) with '
+                         'signal SIGTERM')
+        self.assertEqual(instance.killing, 1)
+        self.assertEqual(options.kills[11], signal.SIGTERM)
+        subprocess_mock.check_output.assert_called_once_with(['timeout', '5', '/bin/echo', '11'], stderr=mock_stdout)
+
+    @patch.object(distutils.spawn, 'find_executable', Mock(return_value=None))
+    @patch('supervisor.process.subprocess')
+    def test_stop_with_prestopcmd_no_timeout_installed(self, subprocess_mock):
+        options = DummyOptions()
+        config = DummyPConfig(options, 'test', '/test', prestopcmd='/bin/echo')
+        instance = self._makeOne(config)
+        instance.pid = 11
+        from supervisor.states import ProcessStates
+        instance.state = ProcessStates.RUNNING
+        mock_stdout = Mock()
+        subprocess_mock.STDOUT = mock_stdout
+        instance.stop()
+        subprocess_mock.check_output.assert_called_once_with(['/bin/echo', '11'], stderr=mock_stdout)
+
+    @patch.object(distutils.spawn, 'find_executable', Mock(return_value='/some/path'))
+    @patch.object(subprocess, 'check_output', Mock(side_effect=subprocess.CalledProcessError(124, 'ignored', 'my output\nsecond line')))
+    def test_stop_with_prestopcmd_timeout(self):
+        options = DummyOptions()
+        config = DummyPConfig(options, 'test', '/test', prestopcmd='/bin/echo')
+        instance = self._makeOne(config)
+        instance.pid = 11
+        from supervisor.states import ProcessStates
+        instance.state = ProcessStates.RUNNING
+        instance.stop()
+        self.assertEqual(options.logger.data[1],
+                "command /bin/echo on test (pid 11) timed out. output: ['my output', 'second line']")
+
+    @patch.object(distutils.spawn, 'find_executable', Mock(return_value='/some/path'))
+    @patch.object(subprocess, 'check_output', Mock(side_effect=subprocess.CalledProcessError(99, 'ignored', 'my output\nsecond line')))
+    def test_stop_with_prestopcmd_bad_exit_code(self):
+        options = DummyOptions()
+        config = DummyPConfig(options, 'test', '/test', prestopcmd='/bin/echo')
+        instance = self._makeOne(config)
+        instance.pid = 11
+        from supervisor.states import ProcessStates
+        instance.state = ProcessStates.RUNNING
+        instance.stop()
+        self.assertEqual(options.logger.data[1],
+                "command /bin/echo on test (pid 11) returned a non-zero exit code (99). output: ['my output', 'second line']")
+
+    @patch.object(distutils.spawn, 'find_executable', Mock(return_value=None))
+    @patch.object(subprocess, 'check_output', Mock(side_effect=subprocess.CalledProcessError(124, 'ignored', 'my output\nsecond line')))
+    def test_stop_with_prestopcmd_bad_exit_code_no_timeout_installed(self):
+        options = DummyOptions()
+        config = DummyPConfig(options, 'test', '/test', prestopcmd='/bin/echo')
+        instance = self._makeOne(config)
+        instance.pid = 11
+        from supervisor.states import ProcessStates
+        instance.state = ProcessStates.RUNNING
+        instance.stop()
+        self.assertEqual(options.logger.data[1],
+                "command /bin/echo on test (pid 11) returned a non-zero exit code (124). output: ['my output', 'second line']")
 
     def test_stop_not_in_stoppable_state_error(self):
         options = DummyOptions()

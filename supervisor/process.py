@@ -354,9 +354,6 @@ class Subprocess(object):
             options.write(2, "supervisor: child process was not spawned\n")
             options._exit(127) # exit process with code for spawn failure
 
-    def is_installed(executable):
-        return (distutils.spawn.find_executable(executable) != None)
-
     def call_prestop_cmd(self):
         """ If specified, call a command on the process, passing it the pid """
         if not self.config.prestopcmd:
@@ -373,7 +370,6 @@ class Subprocess(object):
                                 self.pid)
                              )
 
-        #timeout_cmd_available = is_installed('timeout')
         timeout_cmd_available = (distutils.spawn.find_executable('timeout') != None)
         try:
             if timeout_cmd_available:
