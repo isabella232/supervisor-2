@@ -1869,7 +1869,7 @@ class DummyClientOptions:
         self.plugins = ()
         self._server = DummyRPCServer()
         self.interactive = False
-        self.supress_exit = True
+        self.suppress_exit = True
         self.plugin_factories = [('dummy', DummyPluginFactory, {})]
 
     def getServerProxy(self):

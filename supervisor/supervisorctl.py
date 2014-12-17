@@ -1006,7 +1006,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def handle_error(self, message=None, unhandled=False, logOnly=False):
         if message:
             self.ctl.error_output(message)
-        if (not self.ctl.options.supress_exit and not self.ctl.options.interactive
+        if (not self.ctl.options.suppress_exit and not self.ctl.options.interactive
                 and not logOnly):
             raise SystemExit(2)
         elif unhandled:
