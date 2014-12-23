@@ -128,6 +128,7 @@ class ControllerTests(unittest.TestCase):
         def raise_fault(*arg, **kw):
             raise socket.error(errno.ECONNREFUSED, 'nobody home')
         options._server.supervisor.getVersion = raise_fault
+        options.interactive = True
 
         controller = self._makeOne(options)
         controller.stdout = StringIO()
@@ -138,6 +139,20 @@ class ControllerTests(unittest.TestCase):
         output = controller.stdout.getvalue()
         self.assertTrue('refused connection' in output)
 
+    def test__upcheck_catches_socket_error_ECONNREFUSED_noninteractive(self):
+        options = DummyClientOptions()
+        import socket
+        import errno
+        def raise_fault(*arg, **kw):
+            raise socket.error(errno.ECONNREFUSED, 'nobody home')
+        options._server.supervisor.getVersion = raise_fault
+        options.interactive = False
+
+        controller = self._makeOne(options)
+        controller.stdout = StringIO()
+
+        self.assertRaises(SystemExit, controller.upcheck)
+
     def test__upcheck_catches_socket_error_ENOENT(self):
         options = DummyClientOptions()
         import socket
@@ -145,6 +160,7 @@ class ControllerTests(unittest.TestCase):
         def raise_fault(*arg, **kw):
             raise socket.error(errno.ENOENT, 'nobody home')
         options._server.supervisor.getVersion = raise_fault
+        options.interactive = True
 
         controller = self._makeOne(options)
         controller.stdout = StringIO()
@@ -165,6 +181,20 @@ class ControllerTests(unittest.TestCase):
         controller = self._makeOne(options)
         controller.stdout = StringIO()
         self.assertRaises(socket.error, controller.upcheck)
+
+    def test__upcheck_catches_socket_error_ENOENT_noninteractive(self):
+        options = DummyClientOptions()
+        import socket
+        import errno
+        def raise_fault(*arg, **kw):
+            raise socket.error(errno.ENOENT, 'nobody home')
+        options._server.supervisor.getVersion = raise_fault
+        options.interactive = False
+
+        controller = self._makeOne(options)
+        controller.stdout = StringIO()
+
+        self.assertRaises(SystemExit, controller.upcheck)
 
     def test_onecmd(self):
         options = DummyClientOptions()
@@ -1131,7 +1161,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         result = plugin.do_open('badname')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: url must be http:// or unix://\n')
+                         'Error: url must be http:// or unix://\n')
 
     def test_open_succeed(self):
         plugin = self._makeOne()
@@ -1211,7 +1241,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         result = plugin.do_shutdown('')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: already shutting down\n')
+                         'Error: already shutting down\n')
 
     def test_shutdown_reraises_other_xmlrpc_faults(self):
         plugin = self._makeOne()
@@ -1294,7 +1324,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         plugin.ctl.options._server.supervisor.reloadConfig = reloadConfig
         plugin.do_reread(None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: cant\n')
+                         'Error: cant\n')
 
     def test_reread_shutdown_state(self):
         plugin = self._makeOne()
@@ -1304,7 +1334,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         plugin.ctl.options._server.supervisor.reloadConfig = reloadConfig
         plugin.do_reread(None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: supervisor shutting down\n')
+                         'Error: supervisor shutting down\n')
 
     def test_reread_reraises_other_faults(self):
         plugin = self._makeOne()
@@ -1366,7 +1396,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         result = plugin.do_avail('')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: supervisor shutting down\n')
+                         'Error: supervisor shutting down\n')
 
     def test_avail_reraises_other_faults(self):
         plugin = self._makeOne()
@@ -1397,21 +1427,21 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         result = plugin.do_add('ALREADY_ADDED')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: process group already active\n')
+                         'Error: process group already active\n')
 
     def test_add_bad_name(self):
         plugin = self._makeOne()
         result = plugin.do_add('BAD_NAME')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: no such process/group: BAD_NAME\n')
+                         'Error: no such process/group: BAD_NAME\n')
 
     def test_add_shutdown_state(self):
         plugin = self._makeOne()
         result = plugin.do_add('SHUTDOWN_STATE')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: shutting down\n')
+                         'Error: shutting down\n')
 
     def test_add_reraises_other_faults(self):
         plugin = self._makeOne()
@@ -1438,7 +1468,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         result = plugin.do_remove('BAD_NAME')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: no such process/group: BAD_NAME\n')
+                         'Error: no such process/group: BAD_NAME\n')
 
     def test_remove_still_running(self):
         plugin = self._makeOne()
@@ -1447,7 +1477,7 @@ class TestDefaultControllerPlugin(unittest.TestCase):
         result = plugin.do_remove('STILL_RUNNING')
         self.assertEqual(result, None)
         self.assertEqual(plugin.ctl.stdout.getvalue(),
-                         'ERROR: process/group still running: STILL_RUNNING\n')
+                         'Error: process/group still running: STILL_RUNNING\n')
 
     def test_remove_reraises_other_faults(self):
         plugin = self._makeOne()
@@ -1839,6 +1869,7 @@ class DummyClientOptions:
         self.plugins = ()
         self._server = DummyRPCServer()
         self.interactive = False
+        self.suppress_exit = True
         self.plugin_factories = [('dummy', DummyPluginFactory, {})]
 
     def getServerProxy(self):
@@ -1866,6 +1897,9 @@ class DummyController:
 
     def output(self, data):
         self.stdout.write(data + '\n')
+
+    def error_output(self, data):
+        self.output(data)
 
     def print_topics(self, doc_headers, cmds_doc, rows, cols):
         self.topics_printed.append((doc_headers, cmds_doc, rows, cols))
